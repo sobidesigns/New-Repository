@@ -1,0 +1,305 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if order %}Edit Order{% else %}New Order{% endif %} - Garment ERP{% endblock %}
+{% block page_title %}{% if order %}Edit Order: {{ order.order_number }}{% else %}New Order{% endif %}{% endblock %}
+
+{% block content %}
+<div class="flex gap-2 mb-4">
+    <a href="{% url 'orders:list' %}" class="btn btn-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        Back
+    </a>
+</div>
+
+<form method="post" x-data="orderForm()" @submit.prevent="submitForm">
+    {% csrf_token %}
+    
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+        <!-- Main Form -->
+        <div>
+            <!-- Basic Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="card-title">Order Information</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Customer *</label>
+                            <select name="customer" class="form-select" required x-model="customerId">
+                                <option value="">Select Customer</option>
+                                {% for customer in customers %}
+                                <option value="{{ customer.id }}" {% if order and order.customer_id == customer.id %}selected{% endif %}>
+                                    {{ customer.name }}{% if customer.company_name %} ({{ customer.company_name }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Priority</label>
+                            <select name="priority" class="form-select">
+                                {% for value, label in priorities %}
+                                <option value="{{ value }}" {% if order and order.priority == value %}selected{% elif not order and value == 'normal' %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Order Date *</label>
+                            <input type="date" name="order_date" class="form-input" value="{% if order %}{{ order.order_date|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}" required {% if order %}readonly{% endif %}>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Delivery Date *</label>
+                            <input type="date" name="delivery_date" class="form-input" value="{% if order %}{{ order.delivery_date|date:'Y-m-d' }}{% endif %}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Notes</label>
+                        <textarea name="notes" class="form-textarea" rows="2" placeholder="Customer visible notes">{% if order %}{{ order.notes }}{% endif %}</textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Internal Notes</label>
+                        <textarea name="internal_notes" class="form-textarea" rows="2" placeholder="Internal notes (not visible to customer)">{% if order %}{{ order.internal_notes }}{% endif %}</textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Order Items -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Order Items</h2>
+                    <button type="button" class="btn btn-secondary btn-sm" @click="addItem()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Add Item
+                    </button>
+                </div>
+                <div class="card-body">
+                    <template x-for="(item, index) in items" :key="index">
+                        <div class="card mb-4" style="background: var(--bg-input); border: 1px solid var(--border);">
+                            <div class="card-body">
+                                <div class="flex justify-between mb-4">
+                                    <span class="font-medium">Item <span x-text="index + 1"></span></span>
+                                    <button type="button" class="btn btn-danger btn-sm" @click="removeItem(index)" x-show="items.length > 1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Product *</label>
+                                        <select x-model="item.product_id" class="form-select" required @change="updatePrice(index)">
+                                            <option value="">Select Product</option>
+                                            {% for product in products %}
+                                            <option value="{{ product.id }}" data-price="{{ product.base_price }}">{{ product.code }} - {{ product.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Size</label>
+                                        <select x-model="item.size" class="form-select">
+                                            {% for value, label in sizes %}
+                                            <option value="{{ value }}">{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Color</label>
+                                        <input type="text" x-model="item.color" class="form-input" placeholder="Color">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Quantity *</label>
+                                        <input type="number" x-model.number="item.quantity" class="form-input" min="1" required @input="calculateTotals()">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Unit Price *</label>
+                                        <input type="number" x-model.number="item.unit_price" class="form-input" min="0" step="0.01" required @input="calculateTotals()">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">Description/Specifications</label>
+                                    <textarea x-model="item.description" class="form-textarea" rows="2" placeholder="Custom specifications, measurements, etc."></textarea>
+                                </div>
+                                
+                                <div class="flex justify-between mt-2 pt-2" style="border-top: 1px solid var(--border);">
+                                    <span class="text-muted">Item Total:</span>
+                                    <span class="font-semibold">{{ CURRENCY_SYMBOL }} <span x-text="(item.quantity * item.unit_price).toLocaleString()"></span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="items.length === 0" class="text-center py-4 text-muted">
+                        No items added. Click "Add Item" to start.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div>
+            <!-- Pricing -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="card-title">Pricing</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Discount %</label>
+                            <input type="number" name="discount_percent" class="form-input" x-model.number="discountPercent" min="0" max="100" step="0.01" @input="calculateTotals()">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Tax %</label>
+                            <input type="number" name="tax_percent" class="form-input" x-model.number="taxPercent" min="0" step="0.01" @input="calculateTotals()">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Advance Paid</label>
+                        <input type="number" name="advance_paid" class="form-input" x-model.number="advancePaid" min="0" step="0.01" @input="calculateTotals()">
+                    </div>
+                    
+                    <hr style="border-color: var(--border); margin: 1rem 0;">
+                    
+                    <div class="flex justify-between mb-2">
+                        <span class="text-muted">Subtotal</span>
+                        <span>{{ CURRENCY_SYMBOL }} <span x-text="subtotal.toLocaleString()"></span></span>
+                    </div>
+                    <div class="flex justify-between mb-2" x-show="discountAmount > 0">
+                        <span class="text-muted">Discount</span>
+                        <span class="text-danger">- {{ CURRENCY_SYMBOL }} <span x-text="discountAmount.toLocaleString()"></span></span>
+                    </div>
+                    <div class="flex justify-between mb-2" x-show="taxAmount > 0">
+                        <span class="text-muted">Tax</span>
+                        <span>{{ CURRENCY_SYMBOL }} <span x-text="taxAmount.toLocaleString()"></span></span>
+                    </div>
+                    <div class="flex justify-between font-bold text-lg pt-2" style="border-top: 1px solid var(--border);">
+                        <span>Total</span>
+                        <span>{{ CURRENCY_SYMBOL }} <span x-text="total.toLocaleString()"></span></span>
+                    </div>
+                    <div class="flex justify-between mt-2">
+                        <span class="text-muted">Balance Due</span>
+                        <span class="font-semibold" :class="{ 'text-warning': balanceDue > 0, 'text-success': balanceDue <= 0 }">
+                            {{ CURRENCY_SYMBOL }} <span x-text="balanceDue.toLocaleString()"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Submit -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        {% if order %}Update Order{% else %}Create Order{% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Hidden inputs for items -->
+    <template x-for="(item, index) in items" :key="'hidden-' + index">
+        <input type="hidden" name="items" :value="JSON.stringify(item)">
+    </template>
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function orderForm() {
+    return {
+        customerId: '{% if order %}{{ order.customer_id }}{% endif %}',
+        items: [
+            {% if order %}
+            {% for item in order.items.all %}
+            {
+                product_id: '{{ item.product_id }}',
+                description: '{{ item.description|escapejs }}',
+                size: '{{ item.size }}',
+                color: '{{ item.color }}',
+                quantity: {{ item.quantity }},
+                unit_price: {{ item.unit_price }}
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+            {% else %}
+            { product_id: '', description: '', size: 'M', color: '', quantity: 1, unit_price: 0 }
+            {% endif %}
+        ],
+        discountPercent: {% if order %}{{ order.discount_percent }}{% else %}0{% endif %},
+        taxPercent: {% if order %}{{ order.tax_percent }}{% else %}0{% endif %},
+        advancePaid: {% if order %}{{ order.advance_paid }}{% else %}0{% endif %},
+        subtotal: 0,
+        discountAmount: 0,
+        taxAmount: 0,
+        total: 0,
+        balanceDue: 0,
+        
+        init() {
+            this.calculateTotals();
+        },
+        
+        addItem() {
+            this.items.push({
+                product_id: '',
+                description: '',
+                size: 'M',
+                color: '',
+                quantity: 1,
+                unit_price: 0
+            });
+        },
+        
+        removeItem(index) {
+            this.items.splice(index, 1);
+            this.calculateTotals();
+        },
+        
+        updatePrice(index) {
+            const select = event.target;
+            const option = select.options[select.selectedIndex];
+            const price = parseFloat(option.dataset.price) || 0;
+            this.items[index].unit_price = price;
+            this.calculateTotals();
+        },
+        
+        calculateTotals() {
+            this.subtotal = this.items.reduce((sum, item) => {
+                return sum + (item.quantity * item.unit_price);
+            }, 0);
+            
+            this.discountAmount = this.subtotal * (this.discountPercent / 100);
+            const taxable = this.subtotal - this.discountAmount;
+            this.taxAmount = taxable * (this.taxPercent / 100);
+            this.total = taxable + this.taxAmount;
+            this.balanceDue = this.total - this.advancePaid;
+        },
+        
+        submitForm() {
+            // Validate
+            if (!this.customerId) {
+                alert('Please select a customer');
+                return;
+            }
+            
+            if (this.items.length === 0 || !this.items.some(item => item.product_id)) {
+                alert('Please add at least one item');
+                return;
+            }
+            
+            // Submit
+            document.querySelector('form').submit();
+        }
+    }
+}
+</script>
+{% endblock %}

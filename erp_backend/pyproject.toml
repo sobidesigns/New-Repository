@@ -1,0 +1,16 @@
+[project]
+name = "erp-backend"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=6.0.4",
+    "django-cors-headers>=4.9.0",
+    "djangorestframework>=3.17.1",
+    "gunicorn>=25.3.0",
+    "openpyxl>=3.1.5",
+    "pillow>=12.2.0",
+    "python-dateutil>=2.9.0.post0",
+    "reportlab>=4.4.10",
+    "whitenoise>=6.12.0",
+    "xlsxwriter>=3.2.9",
+]

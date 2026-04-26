@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Orders - Garment ERP{% endblock %}
+{% block page_title %}Orders{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="flex items-center gap-4">
+            <form method="get" class="flex items-center gap-2" style="flex: 1;">
+                <input type="text" name="search" class="form-input" placeholder="Search orders..." value="{{ request.GET.search }}" style="max-width: 250px;">
+                <select name="status" class="form-select" style="max-width: 150px;">
+                    <option value="">All Status</option>
+                    {% for value, label in statuses %}
+                    <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+                {% if request.GET.search or request.GET.status %}
+                <a href="{% url 'orders:list' %}" class="btn btn-secondary btn-sm">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+        <a href="{% url 'orders:create' %}" class="btn btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            New Order
+        </a>
+    </div>
+    
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Delivery Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>
+                        <a href="{% url 'orders:detail' order.pk %}" class="text-primary font-medium">{{ order.order_number }}</a>
+                    </td>
+                    <td>
+                        <div>{{ order.customer.name }}</div>
+                        {% if order.customer.company_name %}
+                        <div class="text-sm text-muted">{{ order.customer.company_name }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-{% if order.status == 'delivered' %}success{% elif order.status == 'cancelled' %}danger{% elif order.status == 'pending' %}warning{% elif order.status == 'on_hold' %}secondary{% else %}info{% endif %}">
+                            {{ order.get_status_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-{% if order.priority == 'urgent' %}danger{% elif order.priority == 'high' %}warning{% else %}secondary{% endif %}">
+                            {{ order.get_priority_display }}
+                        </span>
+                    </td>
+                    <td>{{ order.total_quantity|intcomma }}</td>
+                    <td>{{ CURRENCY_SYMBOL }} {{ order.total|floatformat:0|intcomma }}</td>
+                    <td>
+                        {% if order.is_overdue %}
+                        <span class="text-danger font-medium">{{ order.delivery_date }}</span>
+                        {% else %}
+                        {{ order.delivery_date }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="flex gap-2">
+                            <a href="{% url 'orders:detail' order.pk %}" class="btn btn-secondary btn-sm">View</a>
+                            {% if order.status not in 'delivered,cancelled' %}
+                            <a href="{% url 'orders:edit' order.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 1rem;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        <div>No orders found</div>
+                        <a href="{% url 'orders:create' %}" class="btn btn-primary btn-sm mt-4">Create First Order</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if orders.has_other_pages %}
+    <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border);">
+        <div class="pagination">
+            {% if orders.has_previous %}
+            <a href="?page={{ orders.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" class="page-link">Previous</a>
+            {% endif %}
+            
+            {% for num in orders.paginator.page_range %}
+                {% if orders.number == num %}
+                <span class="page-link active">{{ num }}</span>
+                {% elif num > orders.number|add:'-3' and num < orders.number|add:'3' %}
+                <a href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" class="page-link">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+            
+            {% if orders.has_next %}
+            <a href="?page={{ orders.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" class="page-link">Next</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
